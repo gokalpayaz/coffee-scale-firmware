@@ -14,7 +14,7 @@ except ImportError:
 micropython.alloc_emergency_exception_buf(100)
 
 class DebouncedSwitch:
-    def __init__(self, sw, cb, arg=None, delay=50, tid=4):
+    def __init__(self, sw, cb, arg=None, delay=50, tid=0):
         self.sw = sw
         # Create references to bound methods beforehand
         # http://docs.micropython.org/en/latest/pyboard/library/micropython.html#micropython.schedule
