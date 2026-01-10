@@ -8,19 +8,20 @@ import time
 _HX711_DOUT = const(14)
 _HX711_SCK  = const(13)
 _XH711_GAIN = const(64)
-_RESET_BUTTON_PIN = const(15) # short press to tare scale
-_SLEEP_BUTTON_PIN = const(27) # press 1s to deepsleep, short press to wake
+_RESET_BUTTON_PIN = const(25) # short press to tare scale
+_SLEEP_BUTTON_PIN = const(26) # press 1s to deepsleep, short press to wake
 _SAMPLES = const(10)
 _TEST_WEIGHT = 100 # grams
 
 # buttons
-left_button = Pin(_SLEEP_BUTTON_PIN, Pin.IN, Pin.PULL_DOWN)
-right_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_DOWN)
+left_button = Pin(_SLEEP_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+right_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 
 ### callback functions ###
 
 def left_callback(arg):
     global scale_factor
+    
     scale_factor -= 1
     print("Decrease sscale factor to {}".format(scale_factor))
     hx.set_scale(scale_factor)

@@ -68,8 +68,8 @@ kf.update_estimate(hx.get_units(times=1))
 filtered_weight = 0
 
 # buttons
-reset_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_DOWN)
-sleep_button = Pin(_SLEEP_BUTTON_PIN, Pin.IN, Pin.PULL_DOWN)
+reset_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+sleep_button = Pin(_SLEEP_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 
 ### callback functions ###
 
