@@ -17,9 +17,9 @@ from ssd1306 import SSD1306_I2C
 ### constants ###
 
 _BAT_SWITCH_PIN   = const(2) # en/disables A13/IO35 to read battery voltage
-_BAT_VOLTAGE_PIN  = const(35) # A13
-_RESET_BUTTON_PIN = const(15) # short press to tare scale
-_SLEEP_BUTTON_PIN = const(27) # press 1s to deepsleep, short press to wake
+_BAT_VOLTAGE_PIN  = const(33) # A13
+_RESET_BUTTON_PIN = const(25) # short press to tare scale
+_SLEEP_BUTTON_PIN = const(26) # press 1s to deepsleep, short press to wake
 _I2C_SCL = const(22)
 _I2C_SDA = const(23)
 _SSD1306_WIDTH  = const(128)
@@ -52,7 +52,9 @@ scales = BLEScales(ble)
 kf = KalmanFilter(0.03, q=0.1)
 
 # voltage sense
-vsense_switch = Pin(_BAT_SWITCH_PIN, Pin.OUT)
+# switch not needed when using a physical switch
+# vsense_switch = Pin(_BAT_SWITCH_PIN, Pin.OUT)
+vsense_switch = True
 vsense = ADC(Pin(_BAT_VOLTAGE_PIN))  # A13 or PIN 35
 vsense.atten(ADC.ATTN_11DB)
 
@@ -167,11 +169,11 @@ def main():
     battery_sum = 0
 
     # read battery voltage (en/disable with IO2)
-    vsense_switch.on()
+    # vsense_switch.on()
     time.sleep_ms(10) # wait 10ms for A13(IO35) to turn on
     for i in range(10):
         battery_sum += vsense.read()
-    vsense_switch.off()
+    # vsense_switch.off()
     
     # convert huzzah adc reading max 2369 to thing 2458
     bat_percent = adc_to_percent(int(battery_sum * 0.10375685943436))
