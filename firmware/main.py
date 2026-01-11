@@ -76,6 +76,7 @@ tim = Timer(0)
 timer_running = False
 duration = 0
 display_timer = False
+arm_tim = Timer(0)
 ### callback functions ###
 
 def reset_callback(arg):
@@ -101,6 +102,23 @@ def timer_tick_callback(arg):
     global tim, duration
     duration += 1
   
+def arm_timer_callback(arg):
+    global arm_tim, filtered_weight
+    if _DEBUG: print('timer button long pressed') 
+    arm_tim.init(period=50, mode=Timer.PERIODIC, callback=arm_timer_tick_callback)
+
+
+def arm_timer_tick_callback(arg):
+    global arm_tim, tim, filtered_weight, display_timer, timer_running
+    if timer_running:
+        return
+    if filtered_weight >= 0.2:
+        if _DEBUG: print('Armed timer started')
+        arm_tim.deinit()
+        tim.init(period=1000, mode=Timer.PERIODIC, callback=timer_tick_callback)
+        display_timer = True
+        timer_running = True
+    
     
 # def sleep_callback(arg):
 #     global reset_button, sleep_button, hx, kf
@@ -121,6 +139,7 @@ def timer_tick_callback(arg):
 reset_sw = DebouncedSwitch(sw=reset_button, cb=reset_callback)
 # sleep_sw = DebouncedSwitch(sw=sleep_button, cb=sleep_callback, delay=1000)
 timer_sw = DebouncedSwitch(sw=timer_button, cb=timer_button_callback)
+arm_timer_sw = DebouncedSwitch(sw=timer_button, cb=arm_timer_callback)
 
 
 ### functions ###
