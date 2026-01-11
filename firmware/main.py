@@ -26,7 +26,7 @@ _SSD1306_WIDTH  = const(128)
 _SSD1306_HEIGHT = const(32)
 _HX711_DOUT = const(14)
 _HX711_SCK  = const(13)
-_CALIBRATION_FACTOR = 1959.57 # scale calibration factor
+_CALIBRATION_FACTOR = 2174.6108 # scale calibration factor
 _DEBUG = True
 
 # check if the device woke from a deep sleep
