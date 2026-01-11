@@ -140,13 +140,27 @@ def display_weight():
     global filtered_weight, bat_percent, display_timer, duration
     while True:
         screen.fill(0)
+        
+        if display_timer:
+            time_str = format_time(duration)
+            # Sol üst köşeye yerleştir
+            screen.text(time_str, 0, 1, 1) 
+        else:
+            # Sadece timer yokken o büyük G sprite'ını göster
+            show_sprite(screen, GRAM, 117, 16)
+        
         rounded_weight = round(filtered_weight / 0.05) * 0.05
-        string = '{:.2f}'.format(rounded_weight)
+        if display_timer and rounded_weight >= 100:
+            string = '{:.1f}'.format(rounded_weight)
+        else:
+            string = '{:.2f}'.format(rounded_weight)
+            
         if len(string) > 6:
             string = '{:.1f}'.format(rounded_weight)
         if string == '-0.00':
             string = '0.00'
-        position = 118
+        position = 125 if display_timer else 118
+        
         for char in reversed(string):
             if position < 0:
                 break
@@ -162,20 +176,17 @@ def display_weight():
                 if position < 0:
                     break
                 show_digit(screen, char, position, 1)
-        show_sprite(screen, GRAM, 117, 16)
+        if not display_timer:            
+            show_sprite(screen, GRAM, 117, 16)
         if bat_percent <= 20:
             show_sprite(screen, BATTERY, 117, 1)
-        if display_timer:
-            time_str = format_time(duration)
-            screen.text(time_str, 0, 24, 1)
-        screen.show()
-        
+        screen.show()        
         time.sleep_ms(20)
 
 def format_time(seconds):
     minutes = seconds // 60
     secs = seconds % 60
-    return "{:02d}:{:02d}".format(minutes, secs)
+    return "{}:{:02d}".format(minutes, secs)
 
 ### main block ###
 
