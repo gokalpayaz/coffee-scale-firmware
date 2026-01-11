@@ -102,26 +102,14 @@ sleep_sw = DebouncedSwitch(sw=sleep_button, cb=sleep_callback, delay=1000)
 ### functions ###
 
 def adc_to_percent(v_adc):
-    if v_adc > 2399:  # 4.1-4.2 = 94-100%
-        val = int(0.10169492 * v_adc - 149.966)
-        return val if val <= 100 else 100
-    if v_adc > 2341:  # 4.0-4.1 = 83-94%
-        return int(0.18965517 * v_adc - 360.983)
-    if v_adc > 2282:  # 3.9-4.0 = 72-83%
-        return int(0.18644068 * v_adc - 353.458)
-    if v_adc > 2224:  # 3.8-3.9 = 59-72%
-        return int(0.22413793 * v_adc - 439.483)
-    if v_adc > 2165:  # 3.7-3.8 = 50-59%
-        return int(0.15254237 * v_adc - 280.254)
-    if v_adc > 2107:  # 3.6-3.7 = 33-50%
-        return int(0.29310345 * v_adc - 584.569)
-    if v_adc > 2048:  # 3.5-3.6 = 15-33%
-        return int(0.30508475 * v_adc - 609.814)
-    if v_adc > 1990:  # 3.4-3.5 = 6-15%
-        return int(0.15517241 * v_adc - 302.793)
-    if v_adc >= 1931:  # 3.3-3.4 = 0-6%
-        return int(0.10169492 * v_adc - 196.373)
-    return 0
+    # with divider and adc, it seems pretty much linear. No need for maping in this case
+    ADC_FULL  = 2530   # 4.2 V
+    ADC_EMPTY = 2070   # ~3.5 V (reset eşiği)
+    if v_adc >= ADC_FULL:
+        return 100
+    if adc <= ADC_EMPTY:
+        return 0
+    return int((v_adc-ADC_EMPTY)*100/(ADC_FULL-ADC_EMPTY))
 
 
 def display_weight():
