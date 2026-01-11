@@ -5,7 +5,7 @@ import machine
 import time
 import _thread
 from bluetooth import BLE
-from machine import ADC, I2C, Pin
+from machine import ADC, I2C, Pin, Timer
 from micropython import const
 from art import BATTERY, DOT, GRAM, LOGO, show_digit, show_sprite
 from ble_scales import BLEScales
@@ -19,7 +19,7 @@ from ssd1306 import SSD1306_I2C
 _BAT_SWITCH_PIN   = const(2) # en/disables A13/IO35 to read battery voltage
 _BAT_VOLTAGE_PIN  = const(33) # A13
 _RESET_BUTTON_PIN = const(25) # short press to tare scale
-_SLEEP_BUTTON_PIN = const(26) # press 1s to deepsleep, short press to wake
+_TIMER_BUTTON_PIN = const(26) # short press to arm timer
 _I2C_SCL = const(22)
 _I2C_SDA = const(23)
 _SSD1306_WIDTH  = const(128)
@@ -30,8 +30,8 @@ _CALIBRATION_FACTOR = 2174.6108 # scale calibration factor
 _DEBUG = True
 
 # check if the device woke from a deep sleep
-if machine.reset_cause() == machine.DEEPSLEEP_RESET:
-  if _DEBUG: print('woke up from deepsleep')
+# if machine.reset_cause() == machine.DEEPSLEEP_RESET:
+#   if _DEBUG: print('woke up from deepsleep')
 
 micropython.alloc_emergency_exception_buf(100)
 
@@ -69,8 +69,13 @@ filtered_weight = 0
 
 # buttons
 reset_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
-sleep_button = Pin(_SLEEP_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+timer_button = Pin(_TIMER_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 
+# timer
+tim = Timer(0)
+timer_running = False
+duration = 0
+display_timer = False
 ### callback functions ###
 
 def reset_callback(arg):
@@ -78,25 +83,44 @@ def reset_callback(arg):
     if _DEBUG: print('tare scale')
     hx.tare(times=3)
     kf.last_estimate = 0.0
-
-def sleep_callback(arg):
-    global reset_button, sleep_button, hx, kf
-    if _DEBUG: print('deepsleep')
-    # power down display module
-    screen.poweroff()
-    # power down load cell amp module
-    hx.power_down()
-    # disable pull-down on sleep button
-    sleep_button.init(pull=None)
-    # change handler to wake esp32 on button push
-    reset_button.irq(handler=None)
-    esp32.wake_on_ext0(pin=reset_button, level=esp32.WAKEUP_ANY_HIGH)
-    machine.deepsleep()
+    
+    
+def timer_button_callback(arg):
+    global timer_running, tim, duration, display_timer
+    if _DEBUG: print('timer button pressed')
+    display_timer = True
+    if not timer_running:
+        tim.init(period=1000, mode=Timer.PERIODIC, callback=timer_tick_callback)
+        timer_running = True
+    else:
+        tim.deinit()
+        timer_running = False
+        duration = 0
+    
+def timer_tick_callback(arg):
+    global tim, duration
+    duration += 1
+  
+    
+# def sleep_callback(arg):
+#     global reset_button, sleep_button, hx, kf
+#     if _DEBUG: print('deepsleep')
+#     # power down display module
+#     screen.poweroff()
+#     # power down load cell amp module
+#     hx.power_down()
+#     # disable pull-down on sleep button
+#     sleep_button.init(pull=None)
+#     # change handler to wake esp32 on button push
+#     reset_button.irq(handler=None)
+#     esp32.wake_on_ext0(pin=reset_button, level=esp32.WAKEUP_ANY_HIGH)
+#     machine.deepsleep()
 
 ### interrupts ###
 
 reset_sw = DebouncedSwitch(sw=reset_button, cb=reset_callback)
-sleep_sw = DebouncedSwitch(sw=sleep_button, cb=sleep_callback, delay=1000)
+# sleep_sw = DebouncedSwitch(sw=sleep_button, cb=sleep_callback, delay=1000)
+timer_sw = DebouncedSwitch(sw=timer_button, cb=timer_button_callback)
 
 
 ### functions ###
@@ -113,7 +137,7 @@ def adc_to_percent(v_adc):
 
 
 def display_weight():
-    global filtered_weight, bat_percent
+    global filtered_weight, bat_percent, display_timer, duration
     while True:
         screen.fill(0)
         rounded_weight = round(filtered_weight / 0.05) * 0.05
@@ -141,8 +165,17 @@ def display_weight():
         show_sprite(screen, GRAM, 117, 16)
         if bat_percent <= 20:
             show_sprite(screen, BATTERY, 117, 1)
+        if display_timer:
+            time_str = format_time(duration)
+            screen.text(time_str, 0, 24, 1)
         screen.show()
+        
+        time.sleep_ms(20)
 
+def format_time(seconds):
+    minutes = seconds // 60
+    secs = seconds % 60
+    return "{:02d}:{:02d}".format(minutes, secs)
 
 ### main block ###
 
