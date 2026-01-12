@@ -150,9 +150,9 @@ def adc_to_percent(v_adc):
     ADC_EMPTY = 2070   # ~3.5 V (reset eşiği)
     if v_adc >= ADC_FULL:
         return 100
-    if adc <= ADC_EMPTY:
+    if v_adc <= ADC_EMPTY:
         return 0
-    return int((v_adc-ADC_EMPTY)*100/(ADC_FULL-ADC_EMPTY))
+    return int((v_adc-ADC_EMPTY)*100//(ADC_FULL-ADC_EMPTY))
 
 
 def display_weight():
