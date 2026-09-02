@@ -232,7 +232,7 @@ def main():
     # convert huzzah adc reading max 2369 to thing 2458
     bat_percent = adc_to_percent(int(battery_sum * 0.10375685943436))
     if _DEBUG: print('bat_percent={}'.format(bat_percent))
-    scales.set_battery_level(bat_percent)
+    scales.set_battery(bat_percent)
 
     # start display_weight() in a thread
     _thread.start_new_thread(display_weight, ())
