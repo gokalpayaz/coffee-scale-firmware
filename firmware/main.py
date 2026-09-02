@@ -13,6 +13,7 @@ from debounce import DebouncedSwitch
 from filtering import KalmanFilter
 from hx711 import HX711
 from ssd1306 import SSD1306_I2C
+from smart_switch import SmartSwitch
 
 ### constants ###
 
@@ -137,10 +138,12 @@ def arm_timer_tick_callback(arg):
 ### interrupts ###
 
 reset_sw = DebouncedSwitch(sw=reset_button, cb=reset_callback)
-# sleep_sw = DebouncedSwitch(sw=sleep_button, cb=sleep_callback, delay=1000)
-timer_sw = DebouncedSwitch(sw=timer_button, cb=timer_button_callback)
-arm_timer_sw = DebouncedSwitch(sw=timer_button, cb=arm_timer_callback)
-
+smart_sw = SmartSwitch(
+    pin=timer_button, 
+    short_cb=timer_button_callback, 
+    long_cb=arm_timer_callback, 
+    long_press_ms=1000 # 1 saniye sınırı
+)
 
 ### functions ###
 
