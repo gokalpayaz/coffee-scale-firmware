@@ -5,7 +5,7 @@ import machine
 import time
 import _thread
 from bluetooth import BLE
-from machine import ADC, I2C, Pin, Timer
+from machine import ADC, I2C, Pin, Timer, TouchPad
 from micropython import const
 from art import BATTERY, DOT, GRAM, LOGO, show_digit, show_sprite
 from ble_scales import BLEScales
@@ -27,6 +27,7 @@ _SSD1306_WIDTH  = const(128)
 _SSD1306_HEIGHT = const(32)
 _HX711_DOUT = const(14)
 _HX711_SCK  = const(13)
+_TOUCH_PIN  = const(4)
 _CALIBRATION_FACTOR = 2174.6108 # scale calibration factor
 _DEBUG = True
 
@@ -71,6 +72,9 @@ filtered_weight = 0
 # buttons
 reset_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 timer_button = Pin(_TIMER_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+
+# capacitive touch input
+touch = TouchPad(Pin(_TOUCH_PIN))
 
 # timer
 tim = Timer(0)
@@ -238,10 +242,14 @@ def main():
     _thread.start_new_thread(display_weight, ())
 
     last = 0
+    touch_last = 0
     while True:
         weight = hx.get_units(times=1)
         filtered_weight = kf.update_estimate(weight)
         now = time.ticks_ms()
+        if time.ticks_diff(now, touch_last) > 100:
+            touch_last = now
+            print('touch GPIO{}={}'.format(_TOUCH_PIN, touch.read()))
         if time.ticks_diff(now, last) > 100:
             last = now
             rounded_weight = round(filtered_weight / 0.05) * 0.05
