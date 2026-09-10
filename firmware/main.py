@@ -5,14 +5,14 @@ import machine
 import time
 import _thread
 from bluetooth import BLE
-from machine import ADC, I2C, Pin, Timer, TouchPad
+from machine import ADC, Pin, SPI, Timer, TouchPad
 from micropython import const
 from art import BATTERY, DOT, GRAM, LOGO, show_digit, show_sprite
 from ble_scales import BLEScales
 from debounce import DebouncedSwitch
 from filtering import KalmanFilter
 from hx711 import HX711
-from ssd1306 import SSD1306_I2C
+from ssd1322 import SSD1322_SPI
 from smart_switch import SmartSwitch
 
 ### constants ###
@@ -21,10 +21,13 @@ _BAT_SWITCH_PIN   = const(2) # en/disables A13/IO35 to read battery voltage
 _BAT_VOLTAGE_PIN  = const(33) # A13
 _RESET_BUTTON_PIN = const(25) # short press to tare scale
 _TIMER_BUTTON_PIN = const(26) # short press to arm timer
-_I2C_SCL = const(22)
-_I2C_SDA = const(23)
-_SSD1306_WIDTH  = const(128)
-_SSD1306_HEIGHT = const(32)
+_SSD1322_SCK = const(18)
+_SSD1322_MOSI = const(23)
+_SSD1322_CS = const(19)
+_SSD1322_DC = const(21)
+_SSD1322_RES = const(27)
+_SSD1322_WIDTH = const(256)
+_SSD1322_HEIGHT = const(64)
 _HX711_DOUT = const(13)
 _HX711_SCK  = const(14)
 _TOUCH_PIN  = const(4)
@@ -39,13 +42,23 @@ micropython.alloc_emergency_exception_buf(100)
 
 ### pin/module setup ###
 
-# oled display
-i2c = I2C(-1, scl=Pin(_I2C_SCL), sda=Pin(_I2C_SDA))
-screen = SSD1306_I2C(width=_SSD1306_WIDTH, height=_SSD1306_HEIGHT, i2c=i2c)
-# clear screen and display logo
-screen.fill(0)
-show_sprite(screen, LOGO, 51, 1)
-screen.show()
+# OLED display: SSD1322 4-wire SPI, powered from the ESP32 3V3 rail.
+spi = SPI(
+    2,
+    baudrate=10 * 1024 * 1024,
+    polarity=0,
+    phase=0,
+    sck=Pin(_SSD1322_SCK),
+    mosi=Pin(_SSD1322_MOSI),
+)
+screen = SSD1322_SPI(
+    width=_SSD1322_WIDTH,
+    height=_SSD1322_HEIGHT,
+    spi=spi,
+    dc=Pin(_SSD1322_DC),
+    res=Pin(_SSD1322_RES),
+    cs=Pin(_SSD1322_CS),
+)
 
 # bluetooth
 ble = BLE()
@@ -170,7 +183,7 @@ def display_weight():
         if display_timer:
             time_str = format_time(duration)
             # Sol üst köşeye yerleştir
-            screen.text(time_str, 0, 1, 1) 
+            screen.text(time_str, 0, 1, screen.color_on)
         else:
             # Sadece timer yokken o büyük G sprite'ını göster
             show_sprite(screen, GRAM, 117, 16)
@@ -254,6 +267,7 @@ def main():
             last = now
             rounded_weight = round(filtered_weight / 0.05) * 0.05
             scales.set_weight(rounded_weight, notify=True)
+            print(rounded_weight)
         time.sleep_ms(1)
 
 

@@ -1,8 +1,9 @@
 def show_sprite(screen, sprite, x_offset, y_offset):
+    color_on = screen.color_on
     pixels, mirror_x, mirror_y = sprite
     for y, row in enumerate(pixels):
         for x, c in enumerate(row):
-            screen.pixel(x + x_offset, y + y_offset, c)
+            screen.pixel(x + x_offset, y + y_offset, color_on if c else 0)
     m_offset_x = len(pixels[0])
     m_offset_y = len(pixels)
     if mirror_x > 1:
@@ -12,25 +13,26 @@ def show_sprite(screen, sprite, x_offset, y_offset):
     if mirror_x:
         for y, row in enumerate(pixels):
             for x, c in enumerate(reversed(row)):
-                screen.pixel(x + x_offset + m_offset_x, y + y_offset, c)
+                screen.pixel(x + x_offset + m_offset_x, y + y_offset, color_on if c else 0)
     if mirror_y:
         for y, row in enumerate(reversed(pixels)):
             for x, c in enumerate(row):
-                screen.pixel(x + x_offset, y + y_offset + m_offset_y, c)
+                screen.pixel(x + x_offset, y + y_offset + m_offset_y, color_on if c else 0)
     if mirror_x and mirror_y:
         for y, row in enumerate(reversed(pixels)):
             for x, c in enumerate(reversed(row)):
-                screen.pixel(x + x_offset + m_offset_x, y + y_offset + m_offset_y, c)
+                screen.pixel(x + x_offset + m_offset_x, y + y_offset + m_offset_y, color_on if c else 0)
 
 
 def show_digit(screen, digit, x_offset, y_offset):
+    color_on = screen.color_on
     sprite = globals()["DIGIT_" + str(digit)]
     for segment in sprite:
         pixels, segment_x, segment_y = segment
         for y, row in enumerate(pixels):
             for x, c, in enumerate(row):
                 if c:
-                    screen.pixel(x + x_offset + segment_x, y + y_offset + segment_y, c)
+                    screen.pixel(x + x_offset + segment_x, y + y_offset + segment_y, color_on)
 
 
 def mirror_x(array):
