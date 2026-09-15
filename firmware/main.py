@@ -5,7 +5,7 @@ import machine
 import time
 import _thread
 from bluetooth import BLE
-from machine import ADC, Pin, SPI, Timer, TouchPad
+from machine import ADC, Pin, SPI, Timer
 from micropython import const
 from art import BATTERY, DOT, GRAM, LOGO, show_digit, show_sprite
 from ble_scales import BLEScales
@@ -30,7 +30,13 @@ _SSD1322_WIDTH = const(256)
 _SSD1322_HEIGHT = const(64)
 _HX711_DOUT = const(13)
 _HX711_SCK  = const(14)
-_TOUCH_PIN  = const(4)
+# External touch-sensor modules with ordinary digital outputs.
+_MODE_TARE_TOUCH_PIN = const(4)   # short press = tare, long press = mode
+_TIMER_TOUCH_PIN = const(32)      # short press = timer
+_TOUCH_ACTIVE_LEVEL = const(1)    # Change to 0 if the module reports touch as LOW.
+_TOUCH_SAMPLE_MS = const(20)
+_TOUCH_DEBUG_MS = const(500)
+_MODE_LONG_PRESS_MS = const(1000)
 _CALIBRATION_FACTOR = 2174.6108 # scale calibration factor
 _DEBUG = True
 
@@ -86,8 +92,10 @@ filtered_weight = 0
 reset_button = Pin(_RESET_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 timer_button = Pin(_TIMER_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 
-# capacitive touch input
-touch = TouchPad(Pin(_TOUCH_PIN))
+# External touch-sensor digital inputs. No internal pull is used because the
+# modules are expected to drive their outputs actively.
+mode_tare_touch = Pin(_MODE_TARE_TOUCH_PIN, Pin.IN)
+timer_touch = Pin(_TIMER_TOUCH_PIN, Pin.IN)
 
 # timer
 tim = Timer(0)
@@ -136,6 +144,44 @@ def arm_timer_tick_callback(arg):
         tim.init(period=1000, mode=Timer.PERIODIC, callback=timer_tick_callback)
         display_timer = True
         timer_running = True
+
+
+def mode_touch_long_press():
+    # Mode selection is intentionally only a debug event until modes are defined.
+    if _DEBUG: print('mode touch long pressed')
+
+
+def poll_touch_buttons(state, now):
+    """Print digital input levels and dispatch simple short/long touch events."""
+    mode_value = mode_tare_touch.value()
+    timer_value = timer_touch.value()
+
+    if time.ticks_diff(now, state['last_debug']) >= _TOUCH_DEBUG_MS:
+        state['last_debug'] = now
+        print(
+            'touch mode/tare GPIO{}={} timer GPIO{}={}'.format(
+                _MODE_TARE_TOUCH_PIN, mode_value, _TIMER_TOUCH_PIN, timer_value
+            )
+        )
+
+    for name, value, short_callback, long_callback in (
+        ('mode/tare', mode_value, reset_callback, mode_touch_long_press),
+        ('timer', timer_value, timer_button_callback, None),
+    ):
+        touched = value == _TOUCH_ACTIVE_LEVEL
+        pressed_at = state[name]
+
+        if touched and pressed_at is None:
+            state[name] = now
+            if _DEBUG: print('{} touch pressed ({})'.format(name, value))
+        elif not touched and pressed_at is not None:
+            state[name] = None
+            held_ms = time.ticks_diff(now, pressed_at)
+            if _DEBUG: print('{} touch released after {}ms'.format(name, held_ms))
+            if long_callback is not None and held_ms >= _MODE_LONG_PRESS_MS:
+                long_callback()
+            else:
+                short_callback(None)
     
     
 # def sleep_callback(arg):
@@ -256,13 +302,18 @@ def main():
 
     last = 0
     touch_last = 0
+    touch_state = {
+        'mode/tare': None,
+        'timer': None,
+        'last_debug': 0,
+    }
     while True:
         weight = hx.get_units(times=1)
         filtered_weight = kf.update_estimate(weight)
         now = time.ticks_ms()
-        if time.ticks_diff(now, touch_last) > 100:
+        if time.ticks_diff(now, touch_last) >= _TOUCH_SAMPLE_MS:
             touch_last = now
-            print('touch GPIO{}={}'.format(_TOUCH_PIN, touch.read()))
+            poll_touch_buttons(touch_state, now)
         if time.ticks_diff(now, last) > 100:
             last = now
             rounded_weight = round(filtered_weight / 0.05) * 0.05
