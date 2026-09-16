@@ -12,6 +12,12 @@ _SET_COLUMN = const(0x15)
 _SET_ROW = const(0x75)
 _WRITE_RAM = const(0x5C)
 
+ROTATION_0 = const(0)
+ROTATION_180 = const(180)
+
+_REMAP_ROTATION_0 = const(0x06)
+_REMAP_ROTATION_180 = const(0x14)
+
 
 class SSD1322_SPI(framebuf.FrameBuffer):
     """SSD1322 256x64 panel in 4-wire SPI mode.
@@ -22,9 +28,21 @@ class SSD1322_SPI(framebuf.FrameBuffer):
 
     color_on = const(0x0F)
 
-    def __init__(self, width, height, spi, dc, res, cs, column_offset=0x1C):
+    def __init__(
+        self,
+        width,
+        height,
+        spi,
+        dc,
+        res,
+        cs,
+        column_offset=0x1C,
+        rotation=ROTATION_0,
+    ):
         if width % 4:
             raise ValueError("SSD1322 width must be divisible by 4")
+
+        self._rotation_remap(rotation)
 
         self.width = width
         self.height = height
@@ -33,6 +51,7 @@ class SSD1322_SPI(framebuf.FrameBuffer):
         self.res = res
         self.cs = cs
         self.column_offset = column_offset
+        self.rotation = rotation
         self.buffer = bytearray(width * height // 2)
 
         # Two 4-bit grayscale pixels are stored in each byte.
@@ -75,7 +94,9 @@ class SSD1322_SPI(framebuf.FrameBuffer):
         self.write_cmd(0xCA, 0x3F)  # 1/64 multiplex ratio
         self.write_cmd(0xA2, 0x00)  # display offset
         self.write_cmd(0xA1, 0x00)  # display start line
-        self.write_cmd(0xA0, 0x14, 0x11)  # remap, dual COM line mode
+        # The physical module is upright with the 0x06 remap. 0x14 is the
+        # opposite 180-degree orientation; neither changes framebuffer geometry.
+        self.write_cmd(0xA0, self._rotation_remap(self.rotation), 0x11)
         self.write_cmd(0xAB, 0x01)  # internal VDD regulator
         self.write_cmd(0xB4, 0xA0, 0xFD)  # external VSL
         self.write_cmd(0xC1, 0x9F)  # contrast current
@@ -108,3 +129,17 @@ class SSD1322_SPI(framebuf.FrameBuffer):
 
     def contrast(self, value):
         self.write_cmd(0xC7, value & 0x0F)
+
+    def set_rotation(self, rotation):
+        """Apply one of the two supported physical panel orientations."""
+        remap = self._rotation_remap(rotation)
+        self.rotation = rotation
+        self.write_cmd(0xA0, remap, 0x11)
+
+    @staticmethod
+    def _rotation_remap(rotation):
+        if rotation == ROTATION_0:
+            return _REMAP_ROTATION_0
+        if rotation == ROTATION_180:
+            return _REMAP_ROTATION_180
+        raise ValueError("rotation must be 0 or 180")
