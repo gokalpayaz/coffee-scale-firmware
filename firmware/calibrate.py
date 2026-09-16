@@ -7,7 +7,7 @@ from hx711 import HX711
 from machine import Pin
 from micropython import const
 
-from calibration import calculate_scale_factor
+from calibration import CalibrationStore, calculate_scale_factor
 
 
 # Keep these pins in sync with main.py. DOUT is data from the HX711 and SCK is
@@ -31,6 +31,7 @@ hx = None
 scale_factor = None
 left_switch = None
 right_switch = None
+calibration_store = None
 
 
 def _wait_countdown(seconds=5):
@@ -55,7 +56,11 @@ def _set_scale_factor(value):
     global scale_factor
     scale_factor = value
     hx.set_scale(scale_factor)
-    print("Scale factor: {}".format(scale_factor))
+    try:
+        calibration_store.save(scale_factor)
+        print("Scale factor saved: {}".format(scale_factor))
+    except (OSError, ValueError, TypeError) as error:
+        print("WARNING: scale factor was not saved: {}".format(error))
 
 
 def _decrease_scale_factor(_):
@@ -69,12 +74,13 @@ def _increase_scale_factor(_):
 def main():
     """Calculate a scale factor, then allow fine adjustment with the buttons."""
 
-    global hx, left_switch, right_switch
+    global hx, left_switch, right_switch, calibration_store
 
     right_button = Pin(_RIGHT_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
     left_button = Pin(_LEFT_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 
     hx = HX711(dout=_HX711_DOUT, pd_sck=_HX711_SCK, gain=_HX711_GAIN)
+    calibration_store = CalibrationStore()
     # Raw calibration sampling does not use get_units(), but a non-zero scale
     # keeps the object in a valid state if it is inspected from the REPL.
     hx.set_scale(1.0)
@@ -110,7 +116,7 @@ def main():
             _ADJUSTMENT_STEP
         )
     )
-    print("Copy the final scale factor into _CALIBRATION_FACTOR in main.py.")
+    print("The final scale factor is saved automatically in ESP32 NVS.")
     _wait_countdown()
 
     while True:

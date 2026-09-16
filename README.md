@@ -75,8 +75,8 @@ calibrate.main()
 Follow the prompts using an accurate 100 g reference weight. Once the weight is
 replaced, the left button decreases and the right button increases the scale
 factor in one-count-per-gram steps. The utility prints both the measured weight
-and the current factor. Copy the final value into `_CALIBRATION_FACTOR` in
-`firmware/main.py`; calibration is not saved automatically on the device.
+and the current factor. It saves the calculated value and every fine adjustment
+to ESP32 NVS automatically; normal firmware loads the saved factor at boot.
 
 ## Modified Espresso Workflow
 

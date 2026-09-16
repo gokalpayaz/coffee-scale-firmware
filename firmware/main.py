@@ -19,6 +19,7 @@ from app_contracts import (
     EventQueue,
 )
 from ble_scales import BLEScales
+from calibration import CalibrationStore, DEFAULT_SCALE_FACTOR
 from display_renderer import DisplayRenderer
 from filtering import KalmanFilter
 from hx711 import HX711
@@ -46,7 +47,6 @@ _SSD1322_HEIGHT = const(64)
 
 _HX711_DOUT = const(13)
 _HX711_SCK = const(14)
-_CALIBRATION_FACTOR = 465.6814
 
 _INPUT_POLL_MS = const(10)
 _TELEMETRY_PERIOD_MS = const(100)
@@ -85,6 +85,17 @@ def load_preferences(state):
         if _DEBUG:
             print("preferences unavailable:", error)
         return None
+
+
+def load_calibration_factor():
+    """Load the saved HX711 factor without making boot depend on NVS."""
+
+    try:
+        return CalibrationStore().load()
+    except Exception as error:
+        if _DEBUG:
+            print("calibration unavailable:", error)
+        return DEFAULT_SCALE_FACTOR
 
 
 def apply_actions(actions, controller, preferences, hx, weight_filter, now_ms):
@@ -178,7 +189,7 @@ def main():
     left_touch = Pin(_TIMER_TOUCH_PIN, Pin.IN)
 
     hx = HX711(dout=_HX711_DOUT, pd_sck=_HX711_SCK, gain=64)
-    hx.set_scale(_CALIBRATION_FACTOR)
+    hx.set_scale(load_calibration_factor())
     hx.tare()
     weight_filter = KalmanFilter(0.03, q=0.1)
     initial_weight = hx.get_units(times=1)
