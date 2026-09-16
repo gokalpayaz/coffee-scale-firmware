@@ -1,7 +1,8 @@
-import struct
 import bluetooth
 import time
 from micropython import const
+
+from ble_protocol import make_weight_packet, parse_bookoo_command
 
 _IRQ_CENTRAL_CONNECT = const(1 << 0)
 _IRQ_CENTRAL_DISCONNECT = const(1 << 1)
@@ -26,8 +27,9 @@ _BOOKOO_SERVICE = (
 
 class BLEScales:
 
-    def __init__(self, ble, name="BOOKOO_SC"):
+    def __init__(self, ble, name="BOOKOO_SC", command_sink=None):
         self._ble = ble
+        self._command_sink = command_sink
         self._ble.active(True)
 
         print("bt activated")
@@ -43,8 +45,7 @@ class BLEScales:
         self._connections = set()
 
         self._weight = 0.0
-        self._last_weight = 0.0
-        self._last_weight_time = time.ticks_ms()
+        self._flow = 0.0
         self._battery = 100
 
         self._payload = self._advertising_payload(
@@ -85,18 +86,9 @@ class BLEScales:
             self._advertise()
 
         elif event == _IRQ_GATTS_WRITE:
-            conn_handle, value_handle = data
-            
-            print("BOOKOO CMD:", " ".join("{:02X}".format(b) for b in data))
-            
+            _, value_handle = data
             if value_handle == self._command_handle:
                 command = self._ble.gatts_read(self._command_handle)
-
-                print(
-                    "BOOKOO command:",
-                    " ".join("{:02X}".format(x) for x in command)
-                )
-
                 self._handle_command(command)
 
     # ---------------------------------------------------------
@@ -104,59 +96,40 @@ class BLEScales:
     # ---------------------------------------------------------
 
     def _handle_command(self, command):
+        for normalized_event in parse_bookoo_command(command):
+            self._enqueue_command(normalized_event)
 
-        if len(command) < 3:
+    def _enqueue_command(self, event):
+        if self._command_sink is None:
             return
 
-        # 03 0A xx ...
-        if command[0] != 0x03 or command[1] != 0x0A:
-            return
-
-        command_type = command[2]
-
-        if command_type == 0x01:
-            # TARE
-            print("BOOKOO: tare")
-
-        elif command_type == 0x04:
-            # START TIMER
-            print("BOOKOO: start timer")
-
-        elif command_type == 0x05:
-            # STOP TIMER
-            print("BOOKOO: stop timer")
-
-        elif command_type == 0x06:
-            # RESET TIMER
-            print("BOOKOO: reset timer")
-
-        elif command_type == 0x07:
-            # TARE + START TIMER
-            print("BOOKOO: tare + start timer")
-
-        elif command_type == 0x08:
-            # FLOW SMOOTHING
-            print("BOOKOO: flow smoothing command")
+        push = getattr(self._command_sink, "push", None)
+        if push is not None:
+            push(event)
+        else:
+            self._command_sink(event)
 
     # ---------------------------------------------------------
     # WEIGHT
     # ---------------------------------------------------------
 
-    def set_weight(self, weight, notify=False):
+    def set_measurement(self, weight_g, flow_gps, notify=False):
+        """Publish controller-owned weight and flow without recalculation."""
 
-        self._weight = float(weight)
+        self._weight = float(weight_g)
+        self._flow = float(flow_gps)
 
-        # Store the value in the characteristic too
         packet = self._make_weight_packet()
-
-        self._ble.gatts_write(
-            self._weight_handle,
-            packet
-        )
+        self._ble.gatts_write(self._weight_handle, packet)
 
         if notify:
             self._notify_weight()
-    
+
+    def set_weight(self, weight, notify=False):
+        """Compatibility wrapper that preserves the last controller flow."""
+
+        self.set_measurement(weight, self._flow, notify=notify)
+
     def set_battery(self, battery):
         self._battery = max(0, min(100, int(battery)))
 
@@ -184,104 +157,14 @@ class BLEScales:
     # ---------------------------------------------------------
 
     def _make_weight_packet(self):
-
-        now = time.ticks_ms() & 0xFFFFFF
-
-        weight = self._weight
-
-        # Bookoo uses weight * 100
-        weight_int = int(round(abs(weight) * 100))
-
-        if weight < 0:
-            sign = 0x2D       # '-'
+        ticks_ms = getattr(time, "ticks_ms", None)
+        if ticks_ms is not None:
+            now_ms = ticks_ms()
         else:
-            sign = 0x2B       # '+'
-
-        # Calculate flow rate
-        current_time = time.ticks_ms()
-
-        dt = time.ticks_diff(
-            current_time,
-            self._last_weight_time
+            now_ms = int(time.monotonic() * 1000)
+        return make_weight_packet(
+            self._weight, self._flow, self._battery, now_ms
         )
-
-        if dt > 0:
-            flow = (
-                (weight - self._last_weight)
-                / (dt / 1000.0)
-            )
-        else:
-            flow = 0.0
-
-        self._last_weight = weight
-        self._last_weight_time = current_time
-
-        flow_int = int(round(abs(flow) * 100))
-
-        if flow_int > 32767:
-            flow_int = 32767
-
-        # 24-bit weight
-        weight_int &= 0xFFFFFF
-
-        # 16-bit flow
-        flow_int &= 0xFFFF
-
-        packet = bytearray(20)
-
-        # Header
-        packet[0] = 0x03
-        packet[1] = 0x0B
-
-        # milliseconds, 24-bit
-        packet[2] = (now >> 16) & 0xFF
-        packet[3] = (now >> 8) & 0xFF
-        packet[4] = now & 0xFF
-
-        # Unit
-        # Bookoo currently supports grams
-        packet[5] = 0x00
-
-        # Weight sign
-        packet[6] = sign
-
-        # Weight * 100, 24-bit
-        packet[7] = (weight_int >> 16) & 0xFF
-        packet[8] = (weight_int >> 8) & 0xFF
-        packet[9] = weight_int & 0xFF
-
-        # Flow sign
-        packet[10] = 0x2B if flow >= 0 else 0x2D
-
-        # Flow * 100
-        packet[11] = (flow_int >> 8) & 0xFF
-        packet[12] = flow_int & 0xFF
-
-        # Battery percentage
-        packet[13] = self._battery
-
-        # Standby time * 10
-        packet[14] = 0
-        packet[15] = 0
-
-        # Buzzer
-        packet[16] = 0
-
-        # Flow smoothing
-        packet[17] = 0
-
-        # Reserved
-        packet[18] = 0
-
-        # XOR checksum
-        checksum = 0
-
-        for i in range(19):
-            checksum ^= packet[i]
-
-        packet[19] = checksum
-
-        return packet
 
     # ---------------------------------------------------------
     # ADVERTISING
