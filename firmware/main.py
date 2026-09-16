@@ -21,7 +21,7 @@ from app_contracts import (
 from ble_scales import BLEScales
 from calibration import CalibrationStore, DEFAULT_SCALE_FACTOR
 from display_renderer import DisplayRenderer
-from filtering import KalmanFilter
+from filtering import RobustWeightFilter
 from hx711 import HX711
 from input_events import InputInterpreter
 from measurement import MeasurementController
@@ -105,7 +105,7 @@ def apply_actions(actions, controller, preferences, hx, weight_filter, now_ms):
 
     if actions & ACTION_TARE:
         hx.tare(times=3)
-        weight_filter.last_estimate = 0.0
+        weight_filter.reset(0.0)
         controller.on_tare(now_ms)
         did_tare = True
 
@@ -191,7 +191,7 @@ def main():
     hx = HX711(dout=_HX711_DOUT, pd_sck=_HX711_SCK, gain=64)
     hx.set_scale(load_calibration_factor())
     hx.tare()
-    weight_filter = KalmanFilter(0.03, q=0.1)
+    weight_filter = RobustWeightFilter()
     initial_weight = hx.get_units(times=1)
     filtered_weight = weight_filter.update_estimate(initial_weight)
 

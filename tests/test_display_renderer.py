@@ -230,9 +230,9 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual("01:00", format_elapsed(60000))
         self.assertEqual("99:59", format_elapsed(100 * 60 * 1000))
 
-    def test_weight_precision_boundary_and_negative_zero(self):
-        self.assertEqual("0.00", format_weight(-0.001))
-        self.assertEqual("99.99", format_weight(99.99))
+    def test_weight_uses_one_decimal_and_suppresses_negative_zero(self):
+        self.assertEqual("0.0", format_weight(-0.01))
+        self.assertEqual("100.0", format_weight(99.99))
         self.assertEqual("100.0", format_weight(100.0))
 
     def test_flow_and_ratio_formatting(self):

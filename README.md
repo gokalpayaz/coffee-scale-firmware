@@ -26,6 +26,11 @@ The 256x64 SSD1322 display uses its full width and cycles through four layouts:
 - Timer + ratio + weight
 - Timer + flow + ratio + weight
 
+Weight is displayed at 0.1 g resolution, matching the practical resolution of
+the current 1 kg load cell. Internally, unrounded measurements pass through a
+five-sample median and adaptive smoothing filter before flow, ratio, automatic
+start/stop, BLE, and display processing.
+
 The scale treats the tactile and digital-touch inputs as the same logical left
 and right buttons:
 

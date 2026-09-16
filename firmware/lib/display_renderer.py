@@ -76,12 +76,10 @@ def format_elapsed(elapsed_ms):
 
 
 def format_weight(weight_g):
-    """Use hundredths below 100 g and tenths at and above 100 g."""
+    """Show the realistic 0.1 g resolution of the 1 kg load cell."""
     value = float(weight_g)
-    if abs(value) < 0.005:
+    if abs(value) < 0.05:
         value = 0.0
-    if abs(value) < 100.0:
-        return "{:.2f}".format(value)
     return "{:.1f}".format(value)
 
 
