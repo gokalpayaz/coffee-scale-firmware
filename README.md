@@ -62,6 +62,22 @@ py -3 -m unittest discover -s tests -v
 Automatic thresholds, touch polarity, display orientation, and OLED
 readability still require validation on the physical scale after flashing.
 
+### Load-cell calibration
+
+Connect to the ESP32 serial REPL, interrupt the running firmware with `Ctrl+C`,
+then start the calibration utility:
+
+```python
+import calibrate
+calibrate.main()
+```
+
+Follow the prompts using an accurate 100 g reference weight. Once the weight is
+replaced, the left button decreases and the right button increases the scale
+factor in one-count-per-gram steps. The utility prints both the measured weight
+and the current factor. Copy the final value into `_CALIBRATION_FACTOR` in
+`firmware/main.py`; calibration is not saved automatically on the device.
+
 ## Modified Espresso Workflow
 
 - Power on the scale by pressing the right button. It should take a few seconds to start up and enable the display.
