@@ -20,6 +20,7 @@ from app_contracts import (
 )
 from ble_scales import BLEScales
 from calibration import CalibrationStore, DEFAULT_SCALE_FACTOR
+from device_calibration import boot_chord_requested, run_device_calibration
 from display_renderer import DisplayRenderer
 from filtering import RobustWeightFilter
 from hx711 import HX711
@@ -97,6 +98,17 @@ def load_calibration_factor():
         if _DEBUG:
             print("calibration unavailable:", error)
         return DEFAULT_SCALE_FACTOR
+
+
+def controls_pressed(left_button, right_button, left_touch, right_touch):
+    """Read the tactile and digital-touch controls as one logical pair."""
+
+    return (
+        left_button.value() == 0
+        or left_touch.value() == _TOUCH_ACTIVE_LEVEL,
+        right_button.value() == 0
+        or right_touch.value() == _TOUCH_ACTIVE_LEVEL,
+    )
 
 
 def apply_actions(actions, controller, preferences, tare_settler, now_ms):
@@ -192,8 +204,32 @@ def main():
     right_touch = Pin(_MODE_TARE_TOUCH_PIN, Pin.IN)
     left_touch = Pin(_TIMER_TOUCH_PIN, Pin.IN)
 
+    def read_controls():
+        return controls_pressed(
+            left_button,
+            right_button,
+            left_touch,
+            right_touch,
+        )
+
+    start_calibration = boot_chord_requested(screen, read_controls)
+
     hx = HX711(dout=_HX711_DOUT, pd_sck=_HX711_SCK, gain=64)
-    hx.set_scale(load_calibration_factor())
+    calibration_factor = None
+    if start_calibration:
+        try:
+            calibration_factor = run_device_calibration(
+                hx,
+                CalibrationStore(),
+                screen,
+                read_controls,
+            )
+        except Exception as error:
+            if _DEBUG:
+                print("device calibration unavailable:", error)
+    if calibration_factor is None:
+        calibration_factor = load_calibration_factor()
+    hx.set_scale(calibration_factor)
     hx.tare()
     weight_filter = RobustWeightFilter()
     initial_weight = hx.get_units(times=1)
@@ -223,10 +259,7 @@ def main():
         # Read the surface-mounted control before accepting another weight
         # sample. The debounced state stays true during release debounce, so
         # button force never enters the filter history.
-        right_pressed = (
-            right_button.value() == 0
-            or right_touch.value() == _TOUCH_ACTIVE_LEVEL
-        )
+        left_pressed, right_pressed = read_controls()
         tare_surface_active = right_pressed or input_interpreter.right_is_pressed
         raw_weight = hx.get_units(times=1)
         if not tare_surface_active:
@@ -236,10 +269,6 @@ def main():
 
         if time.ticks_diff(now_ms, last_input_ms) >= _INPUT_POLL_MS:
             last_input_ms = now_ms
-            left_pressed = (
-                left_button.value() == 0
-                or left_touch.value() == _TOUCH_ACTIVE_LEVEL
-            )
             for event in input_interpreter.update(
                 left_pressed,
                 right_pressed,
