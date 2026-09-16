@@ -40,12 +40,14 @@ class ConstantsTests(unittest.TestCase):
             contracts.EVENT_AUTO_CONFIRM,
             contracts.EVENT_AUTO_CANCEL,
             contracts.EVENT_TRANSIENT_LOCK,
+            contracts.EVENT_TIMER_START,
+            contracts.EVENT_TIMER_STOP,
         }
 
         self.assertEqual(4, len(modes))
         self.assertEqual(4, len(states))
         self.assertEqual(2, len(profiles))
-        self.assertEqual(9, len(events))
+        self.assertEqual(11, len(events))
         self.assertNotIn(contracts.EVENT_NONE, events)
 
     def test_action_flags_do_not_overlap(self):

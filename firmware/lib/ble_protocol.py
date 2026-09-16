@@ -1,6 +1,11 @@
 """Pure helpers for the Bookoo-compatible BLE protocol."""
 
-from app_contracts import EVENT_TARE, EVENT_TIMER_RESET, EVENT_TIMER_TOGGLE
+from app_contracts import (
+    EVENT_TARE,
+    EVENT_TIMER_RESET,
+    EVENT_TIMER_START,
+    EVENT_TIMER_STOP,
+)
 
 
 def parse_bookoo_command(command):
@@ -14,12 +19,14 @@ def parse_bookoo_command(command):
     command_type = command[2]
     if command_type == 0x01:
         return (EVENT_TARE,)
-    if command_type == 0x04 or command_type == 0x05:
-        return (EVENT_TIMER_TOGGLE,)
+    if command_type == 0x04:
+        return (EVENT_TIMER_START,)
+    if command_type == 0x05:
+        return (EVENT_TIMER_STOP,)
     if command_type == 0x06:
         return (EVENT_TIMER_RESET,)
     if command_type == 0x07:
-        return (EVENT_TARE, EVENT_TIMER_TOGGLE)
+        return (EVENT_TARE, EVENT_TIMER_START)
     return ()
 
 

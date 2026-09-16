@@ -14,7 +14,8 @@ if LIB_DIR not in sys.path:
 from app_contracts import (
     EVENT_TARE,
     EVENT_TIMER_RESET,
-    EVENT_TIMER_TOGGLE,
+    EVENT_TIMER_START,
+    EVENT_TIMER_STOP,
     EventQueue,
 )
 from ble_protocol import make_weight_packet, parse_bookoo_command
@@ -24,16 +25,16 @@ class BookooProtocolTests(unittest.TestCase):
     def test_parses_supported_commands_to_normalized_events(self):
         self.assertEqual((EVENT_TARE,), parse_bookoo_command(b"\x03\x0a\x01"))
         self.assertEqual(
-            (EVENT_TIMER_TOGGLE,), parse_bookoo_command(b"\x03\x0a\x04")
+            (EVENT_TIMER_START,), parse_bookoo_command(b"\x03\x0a\x04")
         )
         self.assertEqual(
-            (EVENT_TIMER_TOGGLE,), parse_bookoo_command(b"\x03\x0a\x05")
+            (EVENT_TIMER_STOP,), parse_bookoo_command(b"\x03\x0a\x05")
         )
         self.assertEqual(
             (EVENT_TIMER_RESET,), parse_bookoo_command(b"\x03\x0a\x06")
         )
         self.assertEqual(
-            (EVENT_TARE, EVENT_TIMER_TOGGLE),
+            (EVENT_TARE, EVENT_TIMER_START),
             parse_bookoo_command(b"\x03\x0a\x07"),
         )
 
@@ -147,7 +148,7 @@ class BLEScalesTests(unittest.TestCase):
 
         scales._irq(self.ble_scales._IRQ_GATTS_WRITE, (1, 12))
         self.assertEqual(EVENT_TARE, queue.pop())
-        self.assertEqual(EVENT_TIMER_TOGGLE, queue.pop())
+        self.assertEqual(EVENT_TIMER_START, queue.pop())
 
     def test_set_measurement_uses_controller_flow_without_recalculation(self):
         ble = FakeBLE()
@@ -172,6 +173,10 @@ class BLEScalesTests(unittest.TestCase):
         scales.set_measurement(3.5, 0.4)
         scales._irq(self.ble_scales._IRQ_CENTRAL_CONNECT, (7, None, None))
         self.assertEqual(7, ble.notifications[-1][0])
+        self.assertTrue(scales.connected)
+
+        scales._irq(self.ble_scales._IRQ_CENTRAL_DISCONNECT, (7, None, None))
+        self.assertFalse(scales.connected)
 
 
 if __name__ == "__main__":

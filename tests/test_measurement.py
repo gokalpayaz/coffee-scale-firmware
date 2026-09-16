@@ -26,6 +26,8 @@ from app_contracts import (
     EVENT_MODE_NEXT,
     EVENT_TARE,
     EVENT_TIMER_RESET,
+    EVENT_TIMER_START,
+    EVENT_TIMER_STOP,
     EVENT_TIMER_TOGGLE,
     EVENT_TRANSIENT_LOCK,
     MODE_ALL,
@@ -67,6 +69,23 @@ def arm_and_start(controller, state, profile=PROFILE_ESPRESSO, offset=0):
 
 
 class ManualLifecycleTests(unittest.TestCase):
+    def test_explicit_start_and_stop_are_idempotent(self):
+        _, state, controller = make_controller()
+
+        self.assertEqual(
+            ACTION_SESSION_STARTED,
+            controller.handle_event(EVENT_TIMER_START, 0),
+        )
+        self.assertEqual(ACTION_NONE, controller.handle_event(EVENT_TIMER_START, 10))
+        self.assertEqual(SESSION_RUNNING, state.session_state)
+
+        self.assertEqual(
+            ACTION_SESSION_STOPPED,
+            controller.handle_event(EVENT_TIMER_STOP, 20),
+        )
+        self.assertEqual(ACTION_NONE, controller.handle_event(EVENT_TIMER_STOP, 30))
+        self.assertEqual(SESSION_STOPPED, state.session_state)
+
     def test_start_stop_final_hold_resume_and_reset(self):
         _, state, controller = make_controller()
         controller.update(5.0, 0)
@@ -352,6 +371,7 @@ class EspressoAutoStopTests(unittest.TestCase):
         self.assertTrue(action & ACTION_SESSION_STOPPED)
         self.assertEqual(SESSION_STOPPED, state.session_state)
         self.assertFalse(state.auto_enabled)
+        self.assertEqual("espresso_plateau", controller.last_stop_reason)
         final = (state.weight_g, state.flow_gps, state.ratio, state.elapsed_ms)
         controller.update(0.0, plateau_start + 4000)
         self.assertEqual(final, (state.weight_g, state.flow_gps, state.ratio, state.elapsed_ms))
@@ -400,6 +420,7 @@ class PourOverAutoStopTests(unittest.TestCase):
         self.assertTrue(action & ACTION_SESSION_STOPPED)
         self.assertEqual(SESSION_STOPPED, state.session_state)
         self.assertFalse(state.auto_enabled)
+        self.assertEqual("pour_over_drop", controller.last_stop_reason)
 
 
 if __name__ == "__main__":

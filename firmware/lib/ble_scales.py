@@ -133,6 +133,10 @@ class BLEScales:
     def set_battery(self, battery):
         self._battery = max(0, min(100, int(battery)))
 
+    @property
+    def connected(self):
+        return bool(self._connections)
+
     def _notify_weight(self):
 
         packet = self._make_weight_packet()

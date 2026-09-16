@@ -36,6 +36,8 @@ EVENT_AUTO_NEXT = 6
 EVENT_AUTO_CONFIRM = 7
 EVENT_AUTO_CANCEL = 8
 EVENT_TRANSIENT_LOCK = 9
+EVENT_TIMER_START = 10
+EVENT_TIMER_STOP = 11
 
 
 # Controller action flags. Multiple actions may be ORed together.
@@ -85,22 +87,35 @@ class BrewConfig:
     )
 
     def __init__(self):
+        # Coffee dose used by the on-screen 1:x ratio. App configuration is a
+        # later milestone, so V2 intentionally starts with one fixed default.
         self.dose_g = 15.0
 
+        # Auto mode first waits for a quiet, near-zero platform. Once stable,
+        # a small sustained increase marks the first liquid reaching the cup.
         self.arm_zero_tolerance_g = 0.3
         self.arm_stable_window_ms = 1000
         self.arm_stable_max_span_g = 0.2
         self.auto_start_delta_g = 0.5
         self.auto_start_hold_ms = 300
 
+        # Flow is the slope of recent weight samples; EMA prevents individual
+        # load-cell readings from making the numeric value and graph flicker.
         self.flow_window_ms = 1000
         self.flow_ema_alpha = 0.35
 
+        # Espresso may stop only after reaching 15 g and remaining effectively
+        # flat for the full window. This avoids stopping during early pauses.
         self.espresso_min_weight_g = 15.0
         self.espresso_stop_flow_gps = 0.10
         self.espresso_stop_window_ms = 3000
         self.espresso_stop_max_change_g = 0.2
 
+        # Pour-over stops when lifting the dripper/server causes a sudden drop.
+        # `pour_over_drop_g` is the minimum loss inside the short detection
+        # window, not a target beverage weight. The reading must then stay at
+        # least `pour_over_below_peak_g` below the captured peak for the hold
+        # period, which rejects a single noisy HX711 sample.
         self.pour_over_drop_g = 20.0
         self.pour_over_drop_window_ms = 1000
         self.pour_over_below_peak_g = 15.0

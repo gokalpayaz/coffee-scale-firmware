@@ -10,9 +10,57 @@ For this version of the scale, the 3D printed housing was completely redesigned 
 
 An ESP32-based **Feather** microcontroller board is used in place of the **ESP32 Thing** of the original. This board is available from [EzSBC.com](https://www.ezsbc.com/product/esp32-feather/) and vastly reduces the original Adafruit Feather's high deepsleep current draw of 160mA (IIRC) down to 10uA.
 
-The power switch is removed from the housing to free up space in the scale body, and now uses the ESP32 deepsleep mode instead to preserve battery life. An additional button is added to the front panel, with both buttons activating tactile switches mounted inside the body. Holding the left button down > 1sec puts the ESP32 into deepsleep mode. The right button wakes the ESP32 from deepsleep, and while powered on tares/resets the scale. Both buttons use internal pull-up/down resistors in the ESP32, so no extra components are required.
+The current hardware exposes logical left and right controls through both the
+original tactile inputs and external digital-touch modules. The firmware polls
+and debounces these inputs together so either control surface produces the same
+actions. Deep-sleep behavior is not part of the current V2 control mapping.
 
 The `firmware` folder contains the `.py` files that need to be uploaded into the root of the ESP32 running the [MicroPython](https://micropython.org/) interpreter.
+
+## Firmware V2 controls and display modes
+
+The 256x64 SSD1322 display uses its full width and cycles through four layouts:
+
+- Timer + weight
+- Timer + flow + weight, including a flow graph
+- Timer + ratio + weight
+- Timer + flow + ratio + weight
+
+The scale treats the tactile and digital-touch inputs as the same logical left
+and right buttons:
+
+- Right short press: tare (blocked while a measurement is running)
+- Right long press: next display mode
+- Left short press: start/stop or resume the timer
+- Left long press: reset timer, flow, ratio, and graph history
+- Hold both buttons for one second: open the automatic-profile selector
+
+In the automatic-profile selector, use the right button to choose Espresso or
+Pour-over and the left button to confirm. Automatic measurement waits for a
+stable zero, then starts after a persistent 0.5 g increase. Espresso stops on a
+stable plateau after 15 g; Pour-over stops after a sustained large weight drop.
+The 15 g dose is also the current ratio denominator and is intentionally fixed
+until the companion-app command is designed.
+
+The last display mode and automatic profile are stored in ESP32 NVS. A running
+or armed session is never restored after reboot.
+
+### Threshold telemetry and host tests
+
+Set `_TELEMETRY_ENABLED = True` in `firmware/main.py` to emit CSV-like tuning
+records containing raw/filtered weight, flow, state, profile, peak weight,
+candidate condition, stop reason, and free heap. Keep it disabled for normal
+operation.
+
+Run the device-independent test suite before copying the firmware to the ESP32:
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE='1'
+py -3 -m unittest discover -s tests -v
+```
+
+Automatic thresholds, touch polarity, display orientation, and OLED
+readability still require validation on the physical scale after flashing.
 
 ## Modified Espresso Workflow
 

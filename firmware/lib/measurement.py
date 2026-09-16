@@ -20,6 +20,8 @@ from app_contracts import (
     EVENT_MODE_NEXT,
     EVENT_TARE,
     EVENT_TIMER_RESET,
+    EVENT_TIMER_START,
+    EVENT_TIMER_STOP,
     EVENT_TIMER_TOGGLE,
     EVENT_TRANSIENT_LOCK,
     MODE_ALL,
@@ -106,6 +108,7 @@ class MeasurementController:
         self._session_peak_g = state.weight_g
         self._pour_drop_candidate_ms = None
         self._pour_reference_peak_g = state.weight_g
+        self.last_stop_reason = ""
 
         self._apply_profile_display_settings()
 
@@ -138,6 +141,19 @@ class MeasurementController:
             # becomes an immediate manual start and abandons automatic mode.
             self.state.auto_enabled = False
             return self._start_running(now_ms, new_session=False)
+
+        if event == EVENT_TIMER_START:
+            if self.state.session_state == SESSION_RUNNING:
+                return ACTION_NONE
+            if self.state.session_state == SESSION_IDLE:
+                return self._start_running(now_ms, new_session=True)
+            self.state.auto_enabled = False
+            return self._start_running(now_ms, new_session=False)
+
+        if event == EVENT_TIMER_STOP:
+            if self.state.session_state == SESSION_RUNNING:
+                return self._stop_running(now_ms)
+            return ACTION_NONE
 
         if event == EVENT_TIMER_RESET:
             self._reset_session(now_ms)
@@ -218,6 +234,8 @@ class MeasurementController:
 
         self._update_elapsed(now_ms)
         self._sample_graph(now_ms)
+        if weight_g > self._session_peak_g:
+            self._session_peak_g = weight_g
 
         if not self.state.auto_enabled:
             return ACTION_NONE
@@ -284,6 +302,7 @@ class MeasurementController:
         self.state.ratio = 0.0
         self._flow_ema = 0.0
         self._flow_initialized = False
+        self.last_stop_reason = ""
         self._clear_weight_history()
         self._clear_graph()
         self._reset_auto_detection()
@@ -307,11 +326,12 @@ class MeasurementController:
             self._append_graph(0.0)
         return ACTION_SESSION_STARTED
 
-    def _stop_running(self, now_ms):
+    def _stop_running(self, now_ms, reason="manual"):
         self._update_elapsed(now_ms)
         self._elapsed_before_run_ms = self.state.elapsed_ms
         self.state.session_state = SESSION_STOPPED
         self.state.auto_enabled = False
+        self.last_stop_reason = reason
         self._auto_start_candidate_ms = None
         self._pour_drop_candidate_ms = None
         return ACTION_SESSION_STOPPED
@@ -393,12 +413,14 @@ class MeasurementController:
             return ACTION_NONE
         if abs(self.state.flow_gps) > self.config.espresso_stop_flow_gps:
             return ACTION_NONE
-        return self._stop_running(now_ms)
+        return self._stop_running(now_ms, "espresso_plateau")
 
     def _update_pour_over_stop(self, weight_g, now_ms):
         if weight_g > self._session_peak_g:
             self._session_peak_g = weight_g
 
+        # Phase one detects a fast removal-sized drop. Phase two below keeps
+        # the captured peak fixed and requires the lower reading to persist.
         if self._pour_drop_candidate_ms is None:
             recent_max = self._recent_max(
                 now_ms, self.config.pour_over_drop_window_ms
@@ -421,7 +443,7 @@ class MeasurementController:
         if _ticks_diff(now_ms, self._pour_drop_candidate_ms) >= (
             self.config.pour_over_stop_hold_ms
         ):
-            return self._stop_running(now_ms)
+            return self._stop_running(now_ms, "pour_over_drop")
         return ACTION_NONE
 
     def _record_weight(self, weight_g, now_ms):
