@@ -360,6 +360,7 @@ class MeasurementController:
         self._pour_reference_peak_g = self.state.weight_g
 
     def _update_armed(self, weight_g, now_ms):
+        print(f"stable: {self._arm_stable}")
         if not self._arm_stable:
             stable, baseline = self._zero_is_stable(now_ms)
             if stable:
@@ -386,13 +387,17 @@ class MeasurementController:
         maximum = None
         oldest_age = 0
 
-        for logical_index in range(self._history_count):
+        # Walk backwards through the uninterrupted stable run. The first
+        # sample at or beyond the window boundary proves that the run covers
+        # the full duration; it does not have to land on the boundary exactly.
+        for logical_index in range(self._history_count - 1, -1, -1):
             index = self._history_index(logical_index)
             age = _ticks_diff(now_ms, self._history_times[index])
-            if age < 0 or age > self.config.arm_stable_window_ms:
+            if age < 0:
                 continue
             value = self._history_weights[index]
             if abs(value) > self.config.arm_zero_tolerance_g:
+                print(f"{value} abs is more than 0.3 zero tolerance")
                 return False, 0.0
             if minimum is None or value < minimum:
                 minimum = value
@@ -403,11 +408,14 @@ class MeasurementController:
             total += value
             count += 1
 
-        if count < 2 or oldest_age < self.config.arm_stable_window_ms:
-            return False, 0.0
-        if maximum - minimum > self.config.arm_stable_max_span_g:
-            return False, 0.0
-        return True, total / count
+            if maximum - minimum > self.config.arm_stable_max_span_g:
+                print(f"deviation: {maximum-minimum}")
+                return False, 0.0
+            if count >= 2 and age >= self.config.arm_stable_window_ms:
+                return True, total / count
+
+        print(f"count: {count}, oldest_age: {oldest_age}")
+        return False, 0.0
 
     def _update_espresso_stop(self, weight_g, now_ms):
         if weight_g < self.config.espresso_min_weight_g:

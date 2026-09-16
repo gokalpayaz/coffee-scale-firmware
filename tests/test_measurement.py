@@ -358,6 +358,23 @@ class AutoStartTests(unittest.TestCase):
 
         self.assertEqual(SESSION_ARMED, state.session_state)
 
+    def test_stable_zero_does_not_require_exact_window_boundary_sample(self):
+        _, state, controller = make_controller()
+        controller.handle_event(EVENT_AUTO_MENU, 0)
+        controller.handle_event(EVENT_AUTO_CONFIRM, 0)
+
+        # A roughly 90 ms device cadence never produces a sample whose age is
+        # exactly the configured 1000 ms stable window.
+        for now_ms in range(0, 1000, 90):
+            controller.update(0.0, now_ms)
+        controller.update(0.0, 1080)
+
+        controller.update(0.5, 1170)
+        action = controller.update(0.5, 1470)
+
+        self.assertTrue(action & ACTION_SESSION_STARTED)
+        self.assertEqual(SESSION_RUNNING, state.session_state)
+
 
 class EspressoAutoStopTests(unittest.TestCase):
     def test_does_not_stop_below_minimum_weight(self):
