@@ -7,7 +7,11 @@ from hx711 import HX711
 from machine import Pin
 from micropython import const
 
-from calibration import CalibrationStore, calculate_scale_factor
+from calibration import (
+    REFERENCE_WEIGHT_G,
+    CalibrationStore,
+    calculate_scale_factor,
+)
 
 
 # Keep these pins in sync with main.py. DOUT is data from the HX711 and SCK is
@@ -21,7 +25,7 @@ _LEFT_BUTTON_PIN = const(26)
 
 _SAMPLES = const(10)
 _READINGS_PER_SAMPLE = const(100)
-_TEST_WEIGHT_G = 100.0
+_TEST_WEIGHT_G = REFERENCE_WEIGHT_G
 _ADJUSTMENT_STEP = 1.0
 
 

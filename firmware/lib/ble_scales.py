@@ -4,9 +4,10 @@ from micropython import const
 
 from ble_protocol import make_weight_packet, parse_bookoo_command
 
-_IRQ_CENTRAL_CONNECT = const(1 << 0)
-_IRQ_CENTRAL_DISCONNECT = const(1 << 1)
-_IRQ_GATTS_WRITE = const(1 << 2)
+# MicroPython BLE IRQ values are sequential event IDs, not bit flags.
+_IRQ_CENTRAL_CONNECT = const(1)
+_IRQ_CENTRAL_DISCONNECT = const(2)
+_IRQ_GATTS_WRITE = const(3)
 
 # BOOKOO THEMIS MINI
 _BOOKOO_SERVICE_UUID = bluetooth.UUID(0x0FFE)
@@ -27,9 +28,10 @@ _BOOKOO_SERVICE = (
 
 class BLEScales:
 
-    def __init__(self, ble, name="BOOKOO_SC", command_sink=None):
+    def __init__(self, ble, name="BOOKOO_SC", command_sink=None, debug=False):
         self._ble = ble
         self._command_sink = command_sink
+        self._debug = debug
         self._ble.active(True)
 
         print("bt activated")
@@ -86,9 +88,20 @@ class BLEScales:
             self._advertise()
 
         elif event == _IRQ_GATTS_WRITE:
-            _, value_handle = data
+            conn_handle, value_handle = data
+            if self._debug:
+                print(
+                    "BOOKOO GATT write:",
+                    conn_handle,
+                    "handle:",
+                    value_handle,
+                    "command handle:",
+                    self._command_handle,
+                )
             if value_handle == self._command_handle:
                 command = self._ble.gatts_read(self._command_handle)
+                if self._debug:
+                    print("BOOKOO command bytes:", command)
                 self._handle_command(command)
 
     # ---------------------------------------------------------

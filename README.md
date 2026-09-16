@@ -74,19 +74,37 @@ readability still require validation on the physical scale after flashing.
 
 ### Load-cell calibration
 
-Connect to the ESP32 serial REPL, interrupt the running firmware with `Ctrl+C`,
-then start the calibration utility:
+The complete calibration can be started and completed on the scale itself:
+
+1. Start with the scale powered off and empty.
+2. Hold both logical controls while powering it on. Keep holding for the
+   three-second on-screen countdown, then release both controls.
+3. With the platform empty, press left and keep hands off while it measures.
+4. Place an accurate 100 g reference weight on the platform, press left, and
+   keep hands off again.
+5. After `CALIBRATION SAVED` appears, remove the 100 g weight and press left to
+   continue into normal operation.
+
+Either the tactile inputs or the digital-touch modules can be used. Press right
+at either capture prompt to cancel without replacing the stored factor. The
+boot-only three-second chord is deliberately longer than the normal one-second
+automatic-profile chord.
+
+The serial utility remains available for diagnostics and one-count-per-gram
+fine adjustment. Connect to the ESP32 serial REPL, interrupt the running
+firmware with `Ctrl+C`, then run:
 
 ```python
 import calibrate
 calibrate.main()
 ```
 
-Follow the prompts using an accurate 100 g reference weight. Once the weight is
-replaced, the left button decreases and the right button increases the scale
-factor in one-count-per-gram steps. The utility prints both the measured weight
-and the current factor. It saves the calculated value and every fine adjustment
-to ESP32 NVS automatically; normal firmware loads the saved factor at boot.
+Follow the serial prompts using the same accurate 100 g reference weight. Once
+the weight is replaced, the left button decreases and the right button
+increases the scale factor in one-count-per-gram steps. The utility prints both
+the measured weight and the current factor. It saves the calculated value and
+every fine adjustment to ESP32 NVS automatically; normal firmware loads the
+saved factor at boot.
 
 ## Modified Espresso Workflow
 
