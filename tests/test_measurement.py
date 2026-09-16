@@ -233,6 +233,19 @@ class MenuAndTareTests(unittest.TestCase):
         self.assertEqual(0.0, state.flow_gps)
         self.assertEqual(0.0, state.ratio)
 
+    def test_pending_tare_message_remains_until_hardware_tare_completes(self):
+        config, state, controller = make_controller()
+
+        controller.on_tare_pending(100)
+
+        self.assertEqual("TARE", state.transient_message)
+        self.assertEqual(
+            100 + config.tare_timeout_ms + config.transient_message_ms,
+            state.transient_until_ms,
+        )
+        controller.on_tare(200)
+        self.assertEqual("", state.transient_message)
+
     def test_explicit_transient_lock_event(self):
         _, state, controller = make_controller()
         action = controller.handle_event(EVENT_TRANSIENT_LOCK, 0)

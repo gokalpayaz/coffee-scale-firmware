@@ -257,6 +257,15 @@ class MeasurementController:
         self._flow_initialized = False
         self._reset_auto_detection()
 
+    def on_tare_pending(self, now_ms):
+        """Show that tare is waiting for the physical platform to settle."""
+
+        self.state.transient_message = "TARE"
+        self.state.transient_until_ms = _ticks_add(
+            now_ms,
+            self.config.tare_timeout_ms + self.config.transient_message_ms,
+        )
+
     def _ratio_for(self, weight_g):
         if self.config.dose_g <= 0:
             return 0.0

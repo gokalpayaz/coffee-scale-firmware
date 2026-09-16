@@ -40,6 +40,11 @@ and right buttons:
 - Left long press: reset timer, flow, ratio, and graph history
 - Hold both buttons for one second: open the automatic-profile selector
 
+Because the tare button is mounted on the weighing surface, tare is deferred
+after release. The firmware waits at least 350 ms and then requires 300 ms of
+stable weight before sampling the HX711 offset; a two-second timeout prevents a
+request from waiting indefinitely.
+
 In the automatic-profile selector, use the right button to choose Espresso or
 Pour-over and the left button to confirm. Automatic measurement waits for a
 stable zero, then starts after a persistent 0.5 g increase. Espresso stops on a

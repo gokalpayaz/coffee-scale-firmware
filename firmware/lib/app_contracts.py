@@ -82,6 +82,10 @@ class BrewConfig:
         "combo_hold_ms",
         "auto_menu_timeout_ms",
         "transient_message_ms",
+        "tare_min_wait_ms",
+        "tare_stable_window_ms",
+        "tare_stable_max_span_g",
+        "tare_timeout_ms",
         "display_refresh_ms",
         "ble_publish_ms",
     )
@@ -134,6 +138,15 @@ class BrewConfig:
         self.combo_hold_ms = 1000
         self.auto_menu_timeout_ms = 10000
         self.transient_message_ms = 1000
+
+        # The physical tare button is mounted on the weighing surface. Wait
+        # after its release, then require a quiet platform before sampling the
+        # HX711 offset so button force and mechanical rebound are excluded.
+        self.tare_min_wait_ms = 350
+        self.tare_stable_window_ms = 300
+        self.tare_stable_max_span_g = 0.2
+        self.tare_timeout_ms = 2000
+
         self.display_refresh_ms = 100
         self.ble_publish_ms = 100
 

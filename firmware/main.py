@@ -27,6 +27,7 @@ from input_events import InputInterpreter
 from measurement import MeasurementController
 from preferences import Preferences
 from ssd1322 import ROTATION_0, SSD1322_SPI
+from tare import TareSettler
 
 
 # Hardware pins.
@@ -98,16 +99,12 @@ def load_calibration_factor():
         return DEFAULT_SCALE_FACTOR
 
 
-def apply_actions(actions, controller, preferences, hx, weight_filter, now_ms):
+def apply_actions(actions, controller, preferences, tare_settler, now_ms):
     """Apply hardware/persistence side effects requested by the controller."""
 
-    did_tare = False
-
     if actions & ACTION_TARE:
-        hx.tare(times=3)
-        weight_filter.reset(0.0)
-        controller.on_tare(now_ms)
-        did_tare = True
+        tare_settler.request(now_ms)
+        controller.on_tare_pending(now_ms)
 
     if preferences is not None:
         try:
@@ -124,15 +121,21 @@ def apply_actions(actions, controller, preferences, hx, weight_filter, now_ms):
     if _DEBUG and actions & ACTION_SESSION_STOPPED:
         print("session stopped")
 
-    return did_tare
 
-
-def print_telemetry(now_ms, raw_weight, filtered_weight, controller):
+def print_telemetry(
+    now_ms,
+    raw_weight,
+    filtered_weight,
+    controller,
+    tare_settler,
+):
     """Emit replay-friendly diagnostics for physical auto-threshold tuning."""
 
     state = controller.state
     candidate = "none"
-    if getattr(controller, "_auto_start_candidate_ms", None) is not None:
+    if tare_settler.pending:
+        candidate = "tare_wait"
+    elif getattr(controller, "_auto_start_candidate_ms", None) is not None:
         candidate = "auto_start"
     elif getattr(controller, "_pour_drop_candidate_ms", None) is not None:
         candidate = "pour_drop"
@@ -163,6 +166,7 @@ def main():
     controller = MeasurementController(config, state)
     input_interpreter = InputInterpreter(config)
     event_queue = EventQueue(16)
+    tare_settler = TareSettler(config)
 
     spi = SPI(
         2,
@@ -216,8 +220,17 @@ def main():
     gc.collect()
 
     while True:
+        # Read the surface-mounted control before accepting another weight
+        # sample. The debounced state stays true during release debounce, so
+        # button force never enters the filter history.
+        right_pressed = (
+            right_button.value() == 0
+            or right_touch.value() == _TOUCH_ACTIVE_LEVEL
+        )
+        tare_surface_active = right_pressed or input_interpreter.right_is_pressed
         raw_weight = hx.get_units(times=1)
-        filtered_weight = weight_filter.update_estimate(raw_weight)
+        if not tare_surface_active:
+            filtered_weight = weight_filter.update_estimate(raw_weight)
         now_ms = time.ticks_ms()
         did_tare = False
 
@@ -227,10 +240,6 @@ def main():
                 left_button.value() == 0
                 or left_touch.value() == _TOUCH_ACTIVE_LEVEL
             )
-            right_pressed = (
-                right_button.value() == 0
-                or right_touch.value() == _TOUCH_ACTIVE_LEVEL
-            )
             for event in input_interpreter.update(
                 left_pressed,
                 right_pressed,
@@ -239,30 +248,39 @@ def main():
             ):
                 event_queue.push(event)
 
-        while event_queue:
+        # A TARE+START BLE command arrives as two ordered events. Stop draining
+        # while tare settles so START cannot run against the old HX711 offset.
+        while event_queue and not tare_settler.pending:
             event = event_queue.pop()
             actions = controller.handle_event(event, now_ms)
-            if apply_actions(
+            apply_actions(
                 actions,
                 controller,
                 preferences,
-                hx,
-                weight_filter,
+                tare_settler,
                 now_ms,
-            ):
-                did_tare = True
-                raw_weight = 0.0
-                filtered_weight = 0.0
+            )
 
-        actions = controller.update(filtered_weight, now_ms)
-        apply_actions(
-            actions,
-            controller,
-            preferences,
-            hx,
-            weight_filter,
-            now_ms,
-        )
+        if tare_settler.update(filtered_weight, now_ms):
+            hx.tare(times=5)
+            now_ms = time.ticks_ms()
+            weight_filter.reset(0.0)
+            controller.on_tare(now_ms)
+            did_tare = True
+            raw_weight = 0.0
+            filtered_weight = 0.0
+
+        # Freeze automatic start/stop decisions while button force or platform
+        # rebound may still be present in the measurement stream.
+        if not tare_settler.pending and not tare_surface_active:
+            actions = controller.update(filtered_weight, now_ms)
+            apply_actions(
+                actions,
+                controller,
+                preferences,
+                tare_settler,
+                now_ms,
+            )
 
         state.ble_connected = scales.connected
 
@@ -282,12 +300,18 @@ def main():
             now_ms, last_telemetry_ms
         ) >= _TELEMETRY_PERIOD_MS:
             last_telemetry_ms = now_ms
-            print_telemetry(now_ms, raw_weight, filtered_weight, controller)
+            print_telemetry(
+                now_ms,
+                raw_weight,
+                filtered_weight,
+                controller,
+                tare_settler,
+            )
 
         # Keep the variable explicit so a debugger can confirm a tare was
         # physically applied before any ordered BLE START event is processed.
         if did_tare and _DEBUG:
-            print("tare applied")
+            print("tare applied:", tare_settler.last_reason)
 
         time.sleep_ms(1)
 

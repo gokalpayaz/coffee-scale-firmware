@@ -71,6 +71,16 @@ class InputInterpreterTests(unittest.TestCase):
             (EVENT_TIMER_RESET,), self._gesture(True, False, hold_ms=1100)
         )
 
+    def test_exposes_debounced_right_state_through_release(self):
+        self.inputs.update(False, True, False, 10)
+        self.inputs.update(False, True, False, 50)
+        self.assertTrue(self.inputs.right_is_pressed)
+
+        self.inputs.update(False, False, False, 60)
+        self.assertTrue(self.inputs.right_is_pressed)
+        self.inputs.update(False, False, False, 100)
+        self.assertFalse(self.inputs.right_is_pressed)
+
     def test_menu_short_and_long_mappings(self):
         self.assertEqual(
             (EVENT_AUTO_NEXT,), self._gesture(False, True, menu_open=True)

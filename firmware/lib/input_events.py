@@ -90,6 +90,12 @@ class InputInterpreter:
         self._combo_started_ms = None
         self._combo_emitted = False
 
+    @property
+    def right_is_pressed(self):
+        """Expose debounced right-button state for measurement suppression."""
+
+        return self._right.stable_pressed
+
     def update(self, left_pressed, right_pressed, menu_open, now_ms):
         """Poll aggregate levels and return zero or more normalized events.
 
