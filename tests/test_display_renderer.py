@@ -134,15 +134,24 @@ class DisplayRendererTests(unittest.TestCase):
             any(color == COLOR_GRAPH for color in self.screen.pixels.values())
         )
 
-    def test_status_contains_mode_session_auto_profile_ble_and_battery(self):
+    def test_status_places_ble_icon_next_to_battery(self):
         self.state.mode = contracts.MODE_TIMER_FLOW_WEIGHT
         self.state.auto_profile = contracts.PROFILE_POUR_OVER
         self.state.ble_connected = True
         self.renderer.render(self.state, 1000)
 
         self.assertIn("TFW", self.labels())
-        self.assertIn("RUN AP B", self.labels())
+        self.assertIn("RUN AP", self.labels())
+        self.assertNotIn("RUN AP B", self.labels())
         self.assertIn("84%", self.labels())
+        # "84%" begins at x=232, so the 5x7 icon begins eight pixels before it.
+        self.assertEqual(COLOR_PRIMARY, self.screen.pixels[(226, 0)])
+
+    def test_status_hides_ble_icon_while_disconnected(self):
+        self.state.ble_connected = False
+        self.renderer.render(self.state, 1000)
+
+        self.assertNotIn((226, 0), self.screen.pixels)
 
     def test_auto_selection_screen_and_countdown(self):
         self.state.auto_menu_open = True

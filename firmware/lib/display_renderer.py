@@ -31,6 +31,18 @@ COLOR_GRAPH = 11
 COLOR_ALERT = 13
 COLOR_PRIMARY = 15
 
+# A compact Bluetooth rune that fits inside the 8-pixel status row. Framebuf
+# text fonts do not contain the Unicode Bluetooth symbol, so draw it directly.
+_BLUETOOTH_GLYPH = (
+    "00100",
+    "10110",
+    "01101",
+    "00110",
+    "01101",
+    "10110",
+    "00100",
+)
+
 
 # Compact 3x5 glyphs. They keep the main values readable even in an 85 px cell.
 _BIG_GLYPHS = {
@@ -141,20 +153,27 @@ class DisplayRenderer:
         if state.auto_enabled:
             profile = "AE" if state.auto_profile == PROFILE_ESPRESSO else "AP"
             session = session + " " + profile
-        if state.ble_connected:
-            session = session + " B"
 
         battery = max(0, min(100, int(state.battery_percent)))
         battery_text = "{}%".format(battery)
+        battery_x = DISPLAY_WIDTH - len(battery_text) * 8
 
         self.screen.text(mode, 0, 0, COLOR_SECONDARY)
         self.screen.text(session[:12], 80, 0, COLOR_PRIMARY)
         self.screen.text(
             battery_text,
-            DISPLAY_WIDTH - len(battery_text) * 8,
+            battery_x,
             0,
             COLOR_SECONDARY,
         )
+        if state.ble_connected:
+            self._draw_bluetooth(battery_x - 8, 0)
+
+    def _draw_bluetooth(self, x, y):
+        for row, pixels in enumerate(_BLUETOOTH_GLYPH):
+            for column, pixel in enumerate(pixels):
+                if pixel == "1":
+                    self.screen.pixel(x + column, y + row, COLOR_PRIMARY)
 
     def _draw_timer_weight(self, state):
         self._metric_cell(
