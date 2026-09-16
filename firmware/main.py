@@ -52,14 +52,14 @@ _HX711_SCK = const(14)
 _INPUT_POLL_MS = const(10)
 _TELEMETRY_PERIOD_MS = const(100)
 _TELEMETRY_ENABLED = False
-_DEBUG = False
+_DEBUG = True
 
 
 def adc_to_percent(v_adc):
     """Convert the existing voltage-divider ADC scale to a percentage."""
 
-    adc_full = 2530  # 4.2 V
-    adc_empty = 2070  # Approximately 3.5 V.
+    adc_full = 1200  # 4.2 V - Arbitrary number for now
+    adc_empty = 800  # Approximately 3.5 V. - Arbitrary number for now
     if v_adc >= adc_full:
         return 100
     if v_adc <= adc_empty:
