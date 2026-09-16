@@ -204,7 +204,7 @@ def main():
     state.battery_percent = read_battery_percent(vsense)
 
     ble = BLE()
-    scales = BLEScales(ble, command_sink=event_queue)
+    scales = BLEScales(ble, command_sink=event_queue, debug=_DEBUG)
     scales.set_battery(state.battery_percent)
 
     now_ms = time.ticks_ms()

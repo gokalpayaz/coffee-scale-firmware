@@ -150,6 +150,11 @@ class BLEScalesTests(unittest.TestCase):
         self.assertEqual(EVENT_TARE, queue.pop())
         self.assertEqual(EVENT_TIMER_START, queue.pop())
 
+    def test_irq_event_ids_match_micropython_api(self):
+        self.assertEqual(1, self.ble_scales._IRQ_CENTRAL_CONNECT)
+        self.assertEqual(2, self.ble_scales._IRQ_CENTRAL_DISCONNECT)
+        self.assertEqual(3, self.ble_scales._IRQ_GATTS_WRITE)
+
     def test_set_measurement_uses_controller_flow_without_recalculation(self):
         ble = FakeBLE()
         scales = self.ble_scales.BLEScales(ble)
