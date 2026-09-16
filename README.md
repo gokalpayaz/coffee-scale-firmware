@@ -15,7 +15,9 @@ original tactile inputs and external digital-touch modules. The firmware polls
 and debounces these inputs together so either control surface produces the same
 actions. Deep-sleep behavior is not part of the current V2 control mapping.
 
-The `firmware` folder contains the `.py` files that need to be uploaded into the root of the ESP32 running the [MicroPython](https://micropython.org/) interpreter.
+The `firmware` folder now contains only the files used by the running scale.
+Upload `boot.py` and `main.py` to the ESP32 root, and upload the contents of
+`firmware/lib` to `/lib`. Do not upload `extras` or `tests`.
 
 ## Firmware V2 controls and display modes
 
@@ -90,9 +92,11 @@ at either capture prompt to cancel without replacing the stored factor. The
 boot-only three-second chord is deliberately longer than the normal one-second
 automatic-profile chord.
 
-The serial utility remains available for diagnostics and one-count-per-gram
-fine adjustment. Connect to the ESP32 serial REPL, interrupt the running
-firmware with `Ctrl+C`, then run:
+The serial utility remains available under `extras/calibration` for diagnostics
+and one-count-per-gram fine adjustment, but it is not part of the normal device
+image. To use it, temporarily upload `extras/calibration/calibrate.py` to the
+ESP32 root and `extras/calibration/lib/debounce.py` to `/lib`. Connect to the
+ESP32 serial REPL, interrupt the running firmware with `Ctrl+C`, then run:
 
 ```python
 import calibrate
